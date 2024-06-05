@@ -1,6 +1,21 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 
+enum SelectType {
+  Users = 'users',
+  Repos = 'repos',
+}
+
+type UserType = {
+  name: string
+  login: string
+}
+
+type RepoType = {
+  name: string
+  stargazers_count: number
+}
+
 const useDelay = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value)
 
@@ -16,124 +31,123 @@ const useDelay = (value: string, delay: number) => {
   return debouncedValue
 }
 
-interface TypeUser {
-  name: string
-  login: string
+const getUser = async (value: string) => {
+  const res = await fetch(`https://api.github.com/users/${value}`)
+  const data = await res.json()
+  return data
 }
 
-interface TypeRepo {
-  name: string
-  stargazers_count: number
+const getRepo = async (value: string) => {
+  const res = await fetch(`https://api.github.com/repos/${value}`)
+  const data = await res.json()
+  return data
 }
 
-type TypeRepoComponent = {
-  repo?: TypeRepo
-  starsRepo: number
+const getUserRepos = async (params: string) => {
+  const res = await fetch(`https://api.github.com/users/${params}/repos`)
+  const data = await res.json()
+  return data
 }
 
-type TypeUserComponent = {
-  user?: TypeUser
-  userrepo: number
+type UserProps = {
+  user?: UserType
 }
 
-const UserRepo = ({ user, userrepo }: TypeUserComponent) => {
-  if (!user) return null
-  return (
-    <>
-      <h1>FullName: {user.name}</h1>
-      <h2>Stars: {userrepo}</h2>
-    </>
-  )
-}
-
-const Repo = ({ repo, starsRepo }: TypeRepoComponent) => {
-  if (!repo) return null
-  return (
-    <>
-      <h1>FullName: {repo.name}</h1>
-      <h2>Repository: {starsRepo}</h2>
-    </>
-  )
-}
-
-const ServerRequest = ({ name, select }: { name: string; select: string }) => {
-  const [user, setUser] = useState<TypeUser>({
-    name: '',
-    login: '',
-  })
-  const [repo, setRepo] = useState<TypeRepo>({
-    name: '',
-    stargazers_count: 0,
-  })
-  const [userRepo, setUserRepo] = useState<number>(0)
-  const [starsRepo, setStarsRepo] = useState<number>(0)
-  const delaySearceh = useDelay(name, 1200)
-
-  const getUsers = async () => {
-    const res = await fetch(`https://api.github.com/users/${delaySearceh}`)
-    const data = await res.json()
-    return data
-  }
-
-  const getRepos = async () => {
-    const res = await fetch(`https://api.github.com/repos/${delaySearceh}`)
-    const data = await res.json()
-    return data
-  }
-
-  const getRepositoriesUser = async (params: string) => {
-    const res = await fetch(`https://api.github.com/users/${params}/repos`)
-    const data = await res.json()
-    return data
-  }
+const User = ({ user }: UserProps) => {
+  const [repoCount, setRepoCount] = useState<number>(0)
 
   useEffect(() => {
-    if (delaySearceh) {
-      if (select === 'users') {
-        getUsers().then((res) => {
-          setUser(res)
-          getRepositoriesUser(res.login).then((res) => setUserRepo(res.length))
-        })
-      } else if (select === 'repos') {
-        getRepos().then((res) => {
-          setRepo(res)
-          setStarsRepo(res.stargazers_count)
-        })
-      }
+    if (!user) {
+      return
     }
-  }, [delaySearceh])
+
+    getUserRepos(user.login).then((res) => setRepoCount(res?.length ?? 0))
+  }, [user])
+
+  if (!user) return null
 
   return (
     <>
-      {select === 'users' && <UserRepo user={user} userrepo={userRepo} />}
-      {select === 'repos' && <Repo repo={repo} starsRepo={starsRepo} />}
+      <h1>Name: {user.name}</h1>
+      <h2>Repository: {repoCount}</h2>
+    </>
+  )
+}
+
+type RepoProps = {
+  repo?: RepoType
+}
+
+const Repo = ({ repo }: RepoProps) => {
+  if (!repo) return null
+
+  return (
+    <>
+      <h1>Name: {repo.name}</h1>
+      <h2>Stars: {repo.stargazers_count}</h2>
+    </>
+  )
+}
+
+type ContentType = {
+  value: string
+  select: SelectType
+}
+
+const Content = ({ value, select }: ContentType) => {
+  const [user, setUser] = useState<UserType>()
+  const [repo, setRepo] = useState<RepoType>()
+  const delayeValue = useDelay(value, 1200)
+
+  useEffect(() => {
+    if (!delayeValue) {
+      return
+    }
+    if (select === SelectType.Users) {
+      getUser(delayeValue).then((res) => {
+        setUser(res)
+      })
+
+      return
+    }
+
+    if (select === SelectType.Repos) {
+      getRepo(delayeValue).then((res) => {
+        setRepo(res)
+      })
+      return
+    }
+  }, [delayeValue, select])
+
+  return (
+    <>
+      {select === SelectType.Users && <User user={user} />}
+      {select === SelectType.Repos && <Repo repo={repo} />}
     </>
   )
 }
 
 const App = () => {
-  const [select, setSelect] = useState<string>('users')
-  const [name, setName] = useState<string>('')
+  const [select, setSelect] = useState<SelectType>(SelectType.Users)
+  const [value, setValue] = useState<string>('')
 
-  const selectValue = (params: string) => {
+  const selectValue = (params: SelectType) => {
     setSelect(params)
   }
 
   return (
     <div className="App">
       <div>
-        <form action="submit">
-          <h3>Задержка запроса 1200 мс</h3>
-          <input type="text" onChange={(e) => setName(e.target.value)} />
-          <select onChange={(e) => selectValue(e.target.value)}>
-            <option value="users" defaultValue={'users'}>
-              user
-            </option>
-            <option value="repos">repo</option>
-          </select>
-        </form>
+        <h3>Задержка запроса 1200 мс</h3>
+        <input type="text" onChange={(e) => setValue(e.target.value)} />
+        <select onChange={(e) => selectValue(e.target.value as SelectType)}>
+          <option value={SelectType.Users} defaultValue={SelectType.Users}>
+            user
+          </option>
+          <option value={SelectType.Repos}>repo</option>
+        </select>
       </div>
-      <ServerRequest name={name} select={select} />
+      <Content value={value} select={select} />
     </div>
   )
 }
