@@ -1,12 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 
-interface TypeValue {
-  name: string
-  login: string
-  stargazers_count: number
-}
-
 const useDelay = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value)
 
@@ -22,87 +16,107 @@ const useDelay = (value: string, delay: number) => {
   return debouncedValue
 }
 
-interface TypeValue {
+interface TypeUser {
   name: string
   login: string
+}
+
+interface TypeRepo {
+  name: string
   stargazers_count: number
-  type: string
 }
 
-type TypeResult = {
-  value: TypeValue
-  starsAndRepositories: number
+type TypeRepoComponent = {
+  repo?: TypeRepo
+  starsRepo: number
 }
 
-const Result = ({ value, starsAndRepositories }: TypeResult) => {
+type TypeUserComponent = {
+  user?: TypeUser
+  userrepo: number
+}
+
+const UserRepo = ({ user, userrepo }: TypeUserComponent) => {
+  if (!user) return null
   return (
     <>
-      <h1>FullName: {value.name}</h1>
-      <h2>
-        {!value.type ? 'Stars:' : 'Repository:'} {starsAndRepositories}
-      </h2>
+      <h1>FullName: {user.name}</h1>
+      <h2>Stars: {userrepo}</h2>
     </>
   )
 }
 
-const ServerRequest = ({
-  name,
-  activeselect,
-}: {
-  name: string
-  activeselect: string
-}) => {
-  const [value, setValue] = useState<TypeValue>({
+const Repo = ({ repo, starsRepo }: TypeRepoComponent) => {
+  if (!repo) return null
+  return (
+    <>
+      <h1>FullName: {repo.name}</h1>
+      <h2>Repository: {starsRepo}</h2>
+    </>
+  )
+}
+
+const ServerRequest = ({ name, select }: { name: string; select: string }) => {
+  const [user, setUser] = useState<TypeUser>({
     name: '',
     login: '',
-    stargazers_count: 0,
-    type: '',
   })
-  const [starsAndRepositories, setStarsAndRepositories] = useState<number>(0)
+  const [repo, setRepo] = useState<TypeRepo>({
+    name: '',
+    stargazers_count: 0,
+  })
+  const [userRepo, setUserRepo] = useState<number>(0)
+  const [starsRepo, setStarsRepo] = useState<number>(0)
   const delaySearceh = useDelay(name, 1200)
 
-  const handlerRequest = async () => {
-    const res = await fetch(
-      `https://api.github.com/${activeselect}/${delaySearceh}`
-    )
+  const getUsers = async () => {
+    const res = await fetch(`https://api.github.com/users/${delaySearceh}`)
     const data = await res.json()
     return data
   }
 
-  const getRepositoriesUser = async (param: string) => {
-    const res = await fetch(`https://api.github.com/users/${param}/repos`)
+  const getRepos = async () => {
+    const res = await fetch(`https://api.github.com/repos/${delaySearceh}`)
+    const data = await res.json()
+    return data
+  }
+
+  const getRepositoriesUser = async (params: string) => {
+    const res = await fetch(`https://api.github.com/users/${params}/repos`)
     const data = await res.json()
     return data
   }
 
   useEffect(() => {
     if (delaySearceh) {
-      handlerRequest().then((res) => {
-        setValue(res)
-        if (res.type) {
-          getRepositoriesUser(res.login).then((res) =>
-            setStarsAndRepositories(res.length)
-          )
-        } else {
-          setStarsAndRepositories(res.stargazers_count)
-        }
-      })
+      if (select === 'users') {
+        getUsers().then((res) => {
+          setUser(res)
+          getRepositoriesUser(res.login).then((res) => setUserRepo(res.length))
+        })
+      } else if (select === 'repos') {
+        getRepos().then((res) => {
+          setRepo(res)
+          setStarsRepo(res.stargazers_count)
+        })
+      }
     }
   }, [delaySearceh])
 
   return (
     <>
-      <Result value={value} starsAndRepositories={starsAndRepositories} />
+      {select === 'users' && <UserRepo user={user} userrepo={userRepo} />}
+      {select === 'repos' && <Repo repo={repo} starsRepo={starsRepo} />}
     </>
   )
 }
 
 const App = () => {
-  const [activeSelcet, setActiveSelect] = useState<string>('users')
+  const [select, setSelect] = useState<string>('users')
   const [name, setName] = useState<string>('')
 
-  const selectValue = (select: string) => {
-    setActiveSelect(select)
+  const selectValue = (params: string) => {
+    setSelect(params)
   }
 
   return (
@@ -119,7 +133,7 @@ const App = () => {
           </select>
         </form>
       </div>
-      <ServerRequest name={name} activeselect={activeSelcet} />
+      <ServerRequest name={name} select={select} />
     </div>
   )
 }
